@@ -1,0 +1,146 @@
+---
+- hosts: all
+  vars_files:
+    - /opt/ansible/vars/evpn_vars.yml
+    - /opt/ansible/vars/auth.yml
+
+  tasks:
+    - name: Feature Setup
+      nxos_config:
+        lines:
+          - feature dhcp
+          - feature nxapi
+          - feature ospf
+          - feature bgp
+          - feature pim
+          - feature interface-vlan
+          - feature vn-segment-vlan-based
+          - feature dhcp
+          - feature lldp
+          - feature nv overlay
+        host: "{{ inventory_hostname }}"
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+    
+    - name: Fabric Setup
+      nxos_config:
+        lines:
+          - nv overlay evpn
+          - fabric forwarding anycast-gateway-mac AABB.CCDD.EEFF
+          - ip dhcp relay
+          - ip dhcp relay information option
+          - ip dhcp relay information option vpn
+        host: "{{ inventory_hostname }}"
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+  
+    - name: Create VLAN
+      nxos_config:
+        lines:
+          - vn-segment {{ item.vni_id }}
+          - name {{ item.network_name }}
+        parents:
+          - vlan {{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ networks }}"
+
+    - name: Create NVE
+      nxos_config:
+        lines:
+          - source-interface loopback0
+          - host-reachability protocol bgp
+          - no shutdown
+        parents:
+          - interface nve1
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+
+    - name: Create NVE member VNI
+      nxos_config:
+        lines:
+          - suppress-arp
+          - mcast-group {{ item.mc_group }}
+        parents:
+          - interface nve1
+          - member vni {{ item.vni_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ networks }}"
+
+
+    - name: Create VLAN Interface
+      nxos_config:
+        lines:
+          - description {{ item.network_name }}
+          - no shutdown
+          - vrf member {{ item.vrf_name }}
+          - ip address {{ item.gw_address }}
+          - fabric forwarding mode anycast-gateway
+        parents:
+          - interface Vlan{{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      when: item.gw_address is defined
+      with_items: "{{ networks }}"
+
+
+    - name: Create First DHCP Helper
+      nxos_config:
+        lines:
+          - ip dhcp relay address {{ item.dhcp1 }} use-vrf default
+        parents:
+          - interface Vlan{{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      when: item.gw_address is defined and item.dhcp1 is defined
+      with_items: "{{ networks }}"
+
+    - name: Create Second DHCP Helper
+      nxos_config:
+        lines:
+          - ip dhcp relay address {{ item.dhcp2 }} use-vrf default
+        parents:
+          - interface Vlan{{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      when: item.gw_address is defined and item.dhcp2 is defined
+      with_items: "{{ networks }}"
+
+    - name: EVPN Config 
+      nxos_config:
+        lines:
+          - rd auto
+          - route-target import auto
+          - route-target export auto
+        parents:
+          - evpn
+          - vni {{ item.vni_id }} l2
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ networks }}"
+
+

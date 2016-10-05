@@ -1,0 +1,15 @@
+---
+- hosts: all
+  vars_files:
+    - /opt/ansible/vars/auth.yml
+
+  tasks: 
+    - name: Config Banner
+      nxos_config:
+        lines:
+          - "banner motd !\nDon't mess with this\nor I'll call my lawyers\n!"
+        host: "{{ inventory_hostname }}"
+        after: exit
+        username: "{{ user }}"
+        password: "{{ pass }}"
+        transport: cli

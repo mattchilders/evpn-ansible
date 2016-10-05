@@ -1,0 +1,11 @@
+[all:vars]
+ansible_connection = local
+
+[border]
+N9k-1
+N9k-2
+
+[leaf]
+N9k-3
+N9k-4
+

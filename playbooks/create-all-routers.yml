@@ -1,0 +1,108 @@
+---
+- hosts: all
+  vars_files:
+    - /opt/ansible/vars/evpn_vars.yml
+    - /opt/ansible/vars/auth.yml
+    
+  tasks:
+    - name: Fabric Setup
+      nxos_config:
+        lines:
+          - route-map evpn-subnet-policy permit 10
+        host: "{{ inventory_hostname }}"
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+  
+    - name: Create VLAN
+      nxos_config:
+        lines:
+          - vn-segment {{ item.vni_id }}
+          - name VRF-VNI-{{ item.vrf_name }}
+        parents:
+          - vlan {{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+    - name: Create VLAN Interface
+      nxos_config:
+        lines:
+          - description L3 VNI for VRF {{ item.vrf_name }}
+          - no shutdown
+          - vrf member {{ item.vrf_name }}
+          - ip forward
+        parents:
+          - interface Vlan{{ item.vlan_id }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+    - name: Create VRF VNI
+      nxos_config:
+        lines:
+          - vni {{ item.vni_id }}
+          - rd auto
+        parents:
+          - vrf context {{ item.vrf_name }}
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+    - name: Create VRF Address Family
+      nxos_config:
+        lines:
+          - route-target both auto
+          - route-target both auto evpn
+        parents:
+          - vrf context {{ item.vrf_name }}
+          - address-family ipv4 unicast
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+    - name: Create NVE
+      nxos_config:
+        lines:
+          - source-interface loopback0
+          - host-reachability protocol bgp
+          - no shutdown
+          - member vni {{ item.vni_id }} associate-vrf
+        parents:
+          - interface nve1
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+    - name: BGP Config 
+      nxos_config:
+        lines:
+          - advertise l2vpn evpn
+          - redistribute direct route-map evpn-subnet-policy
+        parents:
+          - router bgp {{ item.bgp_as }}
+          - vrf {{ item.vrf_name }}
+          - address-family ipv4 unicast
+        host: "{{ inventory_hostname }}"
+        after: exit
+        transport: cli
+        username: "{{ user }}"
+        password: "{{ pass }}"
+      with_items: "{{ routers }}"
+
+

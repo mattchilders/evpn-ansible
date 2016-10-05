@@ -1,0 +1,11 @@
+networks:
+  - { vlan_id: 1100, vni_id: 51100, vrf_name: App, gw_address: 192.168.1.1/24, mc_group: 239.239.239.1, network_name: AppNet1, dhcp1: 192.168.10.1, dhcp2: 192.168.20.1 }
+  - { vlan_id: 1101, vni_id: 51101, vrf_name: App, gw_address: 192.168.2.1/24, mc_group: 239.239.239.2, network_name: AppNet2, dhcp1: 192.168.10.1 }
+  - { vlan_id: 1102, vni_id: 51102, vrf_name: PCI, gw_address: 192.168.3.1/24, mc_group: 239.239.239.3, network_name: PCINet1 }
+  - { vlan_id: 1103, vni_id: 51103, vrf_name: PCI, gw_address: 192.168.4.1/24, mc_group: 239.239.239.4, network_name: PCINet2 }
+
+routers:
+  - { vlan_id: 2000, vni_id: 6000, vrf_name: App, bgp_as: 65000 }
+  - { vlan_id: 2001, vni_id: 6001, vrf_name: PCI, bgp_as: 65000 }
+  - { vlan_id: 2002, vni_id: 6002, vrf_name: Mgmt, bgp_as: 65000 }
+  - { vlan_id: 2003, vni_id: 6003, vrf_name: Matt, bgp_as: 65000 }
